@@ -1,0 +1,19 @@
+rbf_params_rise.xlsx
+rbf_params.xlsx
+final/comparison_attitude_NoDisturbance.png
+final/comparison_attitude_WithDisturbance.png
+final/comparison_position_NoDisturbance.png
+final/comparison_position_WithDisturbance.png
+final/comparison_rl_norm_NoDisturbance.png
+final/comparison_rl_norm_WithDisturbance.png
+final/comparison_rms_NoDisturbance.png
+final/comparison_rms_WithDisturbance.png
+simulation_runs/
+graph/
+paper_new/
+batch_smc_backstepping_outputs/
+mujoco/__pycache__/
+mujoco/outputs/
+
+# Keep generated simulation data out of the GitHub repository.
+*.mat

@@ -1,0 +1,6 @@
+function eta = rotm2eul_ZYX(R)
+% Inverse of eul2rotm_ZYX; returns [roll;pitch;yaw], not [yaw,pitch,roll].
+eta = [atan2(R(3,2), R(3,3)); ...
+       atan2(-R(3,1), hypot(R(1,1), R(2,1))); ...
+       atan2(R(2,1), R(1,1))];
+end

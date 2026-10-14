@@ -1,0 +1,1282 @@
+                                                       Journal Title
+                                                       XX(X):2–32
+RBF-ESO                                                ©The Author(s) 2026
+                                                       Reprints and permission:
+Backstepping Control                                   sagepub.co.uk/journalsPermissions.nav
+                                                       DOI: 10.1177/ToBeAssigned
+
+for Multi-UAV                                          www.sagepub.com/
+
+                                                        SAGE
+Cooperative Payload
+Transportation
+
+Kangkai Li1 , Qicheng Wang1 , Fan Zhou1 and Jian Sun1
+
+
+
+Abstract
+Cooperative payload transportation with multiple unmanned aerial
+vehicles (UAVs) is challenging because the payload dynamics are
+strongly coupled with cable constraints, nonlinear rotational motion,
+allocation errors, and external disturbances. This paper proposes
+an RBF-ESO backstepping control framework for robust payload-
+level trajectory tracking. A nominal backstepping controller is first
+constructed to generate the desired payload force and moment
+commands. A radial basis function (RBF) neural network is then
+introduced to approximate unmodeled nonlinear dynamics online,
+while an extended state observer (ESO) estimates the remaining
+lumped disturbances for feedforward compensation. To evaluate the
+contribution of each component, the proposed controller is tested
+through backstepping-family ablation studies under nominal and
+disturbed conditions. Simulation results show that the combined RBF-
+ESO compensation improves both tracking accuracy and disturbance
+rejection. The ablation results demonstrate that integrating neural
+approximation and observer-based disturbance estimation within a
+backstepping structure provides a balanced and robust control strategy
+for multi-UAV cooperative payload transportation.
+
+Keywords
+multi-UAV cooperative transportation; payload transportation; back-
+stepping control; RBF neural network; extended state observer
+
+Prepared using sagej.cls [Version: 2017/01/17 v1.20]
+2                                                       Journal Title XX(X)
+
+Introduction
+UAV technology has developed rapidly in recent years and is now
+widely used in aerial imaging, agriculture, industry, and material delivery.
+Recently, increasing attention has been directed toward multi-UAV
+systems. Compared with single-UAV platforms, multi-UAV cooperative
+systems provide higher payload capacity, greater flexibility, and improved
+fault tolerance. Among these applications, multi-UAV cooperative
+payload transportation has attracted significant interest due to its potential
+for transporting heavy and large-sized materials Fink et al. (2011); Lee
+et al. (2013c); Estevez et al. (2024).
+   However, cooperative payload transportation remains a challenging
+problem in aerial robotics. The presence of flexible cables, coupled motion
+constraints, and strong interactions among multiple UAVs and the payload
+leads to a high-dimensional, nonlinear, and tightly coupled dynamical
+system. In practice, these couplings introduce significant difficulties in
+both controller design and stability analysis, especially when precise
+trajectory tracking and attitude regulation are required simultaneously
+Goodarzi et al. (2015); Sreenath et al. (2013); Lee (2018). Although a
+complete geometric dynamic model has been established in prior work
+Lee et al. (2013a); Lee (2014), achieving robust and high-accuracy control
+under external disturbances, parameter uncertainties, and unmodeled
+dynamics is still nontrivial. Therefore, developing control strategies that
+combine accurate modeling with strong disturbance-rejection capability
+remains an important research direction for cooperative multi-UAV
+payload transportation.
+   To address these challenges, a variety of control strategies have been
+developed in the literature. Nonlinear methods, such as backstepping
+and sliding-mode control, have been widely adopted for UAV systems
+because of their ability to handle strong nonlinearities Bouabdallah and
+Siegwart (2005); Madani and Benallegue (2008); Thanh et al. (2022).
+Nevertheless, these approaches often depend on relatively accurate system
+models, and their performance can degrade when significant parameter
+
+1 Xi’an Jiaotong University, Xi’an, China
+
+
+Corresponding author:
+Jian Sun, Xi’an Jiaotong University, Xi’an, China.
+Email: sunjian10@xjtu.edu.cn
+
+
+
+Prepared using sagej.cls
+Li et al.                                                                 3
+
+uncertainties and unmodeled dynamics are present. To mitigate these
+limitations, adaptive control schemes and neural-network-based methods
+have been introduced to approximate unknown dynamics online Sanner
+and Slotine (1992); Park and Sandberg (1991); Shen and Xu (2021). In
+addition, ESO and ADRC methods provide a practical observer-based
+route for estimating lumped disturbances and improving robustness Han
+(2009); Gao (2003); Madoński and Herman (2015); Wang et al. (2022).
+These developments motivate the use of learning-based compensation
+terms together with robust feedback to improve tracking performance
+under modeling uncertainty.
+  In this paper, we develop an RBF-ESO backstepping controller for
+multi-UAV cooperative payload transportation. Backstepping is adopted
+as the nominal nonlinear tracking controller because it provides a recursive
+error-stabilization structure for the payload translation and attitude
+channels. An RBF neural network is then introduced to approximate
+unmodeled nonlinear dynamics online Broomhead and Lowe (1988);
+Park and Sandberg (1991); Shen and Xu (2021), while an ESO is used
+to estimate the residual lumped disturbance that remains after neural
+approximation Han (2009); Madoński and Herman (2015); Gu et al.
+(2022). The resulting compensation terms are incorporated directly into
+the payload force and moment commands.
+  The main contribution of this paper is a simulation-oriented ablation
+framework for evaluating the proposed composite controller. The
+framework compares plain backstepping, RBF-augmented backstepping,
+ESO-augmented backstepping, and the combined RBF-ESO backstepping
+controller under both no-disturbance and disturbance-injection cases.
+This organization makes it possible to identify the individual roles of
+RBF approximation and ESO disturbance estimation within the same
+cooperative transportation task.
+
+System Modeling
+The dynamic model used in this paper is based on the geometric
+formulation proposed by Lee et al. for multiple quadrotor UAVs
+transporting a cable-suspended rigid body Lee et al. (2013a,c). In that
+framework, a cooperative aerial transportation system consists of N
+quadrotors carrying a rigid payload through massless, taut, inextensible
+
+
+
+Prepared using sagej.cls
+4                                                          Journal Title XX(X)
+
+cables. The payload dynamics and individual quadrotor dynamics are
+derived separately and are coupled through kinematic constraints.
+
+Coordinate Frames and State Representation
+We define three primary coordinate frames:
+Inertial Frame (I ) A fixed Earth frame defined by basis vectors
+{e1 , e2 , e3 }, where e3 = [0, 0, 1]T denotes the positive vertical axis; gravity
+is represented as +ge3 under the NED convention.
+Payload Body Frame (L) Attached to the payload center of mass (CoM),
+with orientation RL ∈ SO(3) relative to I.
+Quadrotor Body Frame (Bi ) Attached to the CoM of the i-th quadrotor
+(i = 1 . . . N ), with orientation Ri ∈ SO(3) relative to I.
+   For both the payload and each quadrotor, the dynamic variables are
+position p, linear velocity v, attitude matrix R, and angular velocity Ω.
+Here, p and v are expressed in the inertial frame, R ∈ SO(3) denotes
+attitude, and Ω is expressed in the corresponding body frame. Subscripts
+denote object indices: L for the payload, i for the i-th quadrotor (or cable),
+and ext for external disturbances.
+
+
+
+
+Prepared using sagej.cls
+Li et al.                                                                   5
+
+
+
+
+Figure 1. The UAVs and payload geometric structure.
+
+
+Kinematic Constraints
+The payload is connected to the i-th quadrotor by a taut, inextensible cable
+of length li . Let ρi be the vector of the connection point on the load in the
+L frame, then the geometric relationship follows the equation below.
+                                 pi = pL + RL ρi − li qi                  (1)
+where qi ∈ S2 is the unit vector representing the cable direction, pointing
+from the quadrotor to the payload.
+  Then differentiating with respect to time yields the velocity relationship:
+                           vi = vL + RL (ΩL × ρi ) − li ωi × qi           (2)
+Here, the cable angular velocity ωcable,i satisfies q̇i = ωi × qi .
+
+Payload Dynamics
+We consider a 6-DOF rigid body with mass mL and inertia tensor JL ,and
+derive the equations of motion using the Newton-Euler method..
+
+Prepared using sagej.cls
+6                                                                Journal Title XX(X)
+
+Translational Dynamics The total force acting on the payload is
+composed of gravity, the tension forces Ti from all N cables, and an
+external disturbance force fext :
+                                               N
+                                               X
+                           mL v̇L = mL ge3 +         Ti + fext                   (3)
+                                               i=1
+
+where Ti = −µi qi is the tension vector, with µi > 0 being the tension
+magnitude, and fext ∈ R3 denotes the lumped external disturbance force.
+Rotational Dynamics The rotational motion is driven by the moments
+generated by the cable tensions applied at lever arms ρi :
+                                             N
+                                             X
+                JL Ω̇L = −ΩL × (JL ΩL ) +          ρi × (RTL Ti ) + τext         (4)
+                                             i=1
+
+where τext represents external disturbance torques.
+
+Quadrotor Dynamics
+Each quadrotor is treated as an independent rigid body subject to its own
+thrust, gravity, and the reaction force from the cable tension (−Ti ).
+Translational Dynamics
+
+                           mi v̇i = mi ge3 − fi Ri e3 − Ti                       (5)
+where fi is the total scalar thrust generated by the i-th quadrotor rotors,
+and −Ri e3 represents the thrust direction in the inertial frame.
+Rotational Dynamics
+
+                             Ji Ω̇i = −Ωi × (Ji Ωi ) + τi                        (6)
+where τi = [τϕ , τθ , τψ ]T are the control torques in the body frame.
+
+Hierarchical Control Design
+To address uncertainties in payload dynamics and external disturbances,
+we propose an adaptive robust control scheme that integrates backstepping
+control, radial basis function (RBF) neural-network approximation, and
+extended state observer (ESO) disturbance estimation while following the
+
+Prepared using sagej.cls
+Li et al.                                                                7
+
+geometric payload-transport control framework in Lee et al. (2013a); Lee
+(2018). The backstepping component generates the nominal payload force
+and moment commands, the RBF network compensates for unmodeled
+nonlinear dynamics Sanner and Slotine (1992); Park and Sandberg (1991),
+and the ESO estimates residual disturbances that are not fully captured by
+the neural approximation Han (2009); Madoński and Herman (2015).
+  The overall signal flow of the proposed hierarchical controller is
+shown in Fig. 2. The payload tracking errors are first processed by the
+nominal backstepping structure, while the RBF and ESO modules provide
+online compensation for model uncertainty and residual disturbances. The
+resulting payload-level force and moment commands are then distributed
+through the cable-force allocation layer and converted into executable
+quadrotor thrust and attitude commands.
+
+State and Error Definitions
+The payload translational state is described by the position pL ∈ R3 and
+linear velocity vL ∈ R3 , with desired trajectories pL,d and vL,d . The
+payload attitude can be equivalently represented by the rotation matrix
+RL ∈ SO(3) for geometric modeling. However, the implemented RBF-
+adaptive Backstepping-ESO controller uses the Euler-angle coordinates
+of the payload attitude. Let
+                            ⊤                              ⊤
+        ΘL = ϕL θL ψL ,              ΘL,d = ϕL,d θL,d ψL,d ,          (7)
+denote the current and desired payload Euler-angle vectors, respectively.
+The payload tracking errors used in the controller are therefore defined as
+                           epL = pL − pL,d ,
+                           evL = vL − vL,d ,                            (8)
+                           eΘL = ΘL − ΘL,d .
+  Based on these definitions, the composite input vector of the RBF
+network is chosen as                 
+                                 ep L
+                          ξ=            ∈ R6 .                   (9)
+                                eΘL
+
+RBF Neural Network Approximation
+RBF networks are widely used for nonlinear function approximation
+because Gaussian basis functions yield a linearly parameterized
+
+Prepared using sagej.cls
+8                                                               Journal Title XX(X)
+
+
+
+
+Figure 2. Pipeline of the proposed RBF-ESO backstepping control framework for multi-UAV
+cooperative payload transportation.
+
+
+
+
+Prepared using sagej.cls
+Li et al.                                                                9
+
+approximator with universal approximation capability Broomhead and
+Lowe (1988); Park and Sandberg (1991). In this project, the RBF
+approximation is not implemented as a single global network. Instead,
+six scalar Gaussian RBF networks are used in parallel: three for payload
+translation and three for payload attitude. All six channels share the
+same composite input vector ξ ∈ R6 defined in (9), while each channel
+has its own adaptive weight vector. This structure matches the controller
+implementation, where five basis nodes are assigned to each controlled
+degree of freedom, resulting in a total of 6 × 5 = 30 adaptive parameters.
+   The channel-wise RBF structure used for online uncertainty approxi-
+mation is illustrated in Fig. 3. The shared tracking-error input is mapped
+through Gaussian basis functions, and the resulting channel outputs
+are injected into the translational and rotational payload controllers as
+adaptive compensation terms.
+   For the j-th basis node, the Gaussian activation is defined as
+                               ∥ξ − cj ∥2
+                                         
+              hj (ξ) = exp −                ,     j = 1, . . . , 5,    (10)
+                                  2b2j
+where cj ∈ R6 is the center of the j-th node and bj > 0 is its width. To
+improve numerical robustness, the implementation normalizes the basis
+functions according to
+                 h(ξ)                                        ⊤
+     h̄(ξ) = P5             ,      h(ξ) = h1 (ξ) · · · h5 (ξ) ,       (11)
+                j=1 hj (ξ)
+
+whenever 5j=1 hj (ξ) is non-negligible.
+          P
+
+  For the translational channels, let θ̂p,i ∈ R5 , i = 1, 2, 3, denote the
+adaptive weight vectors for the x-, y-, and z-directions. The RBF outputs
+are
+                   fˆp,i (ξ) = θ̂p,i
+                                 ⊤
+                                     h̄(ξ),   i = 1, 2, 3,            (12)
+and they are stacked as
+                                                                  ⊤
+                           f̂p (ξ) = fˆp,1 (ξ) fˆp,2 (ξ) fˆp,3 (ξ) .
+                                    
+                                                                       (13)
+
+In the implemented force controller, f̂p (ξ) is interpreted as an estimate
+of acceleration-level uncertainty in the payload translational dynamics,
+which is why it appears in the control law multiplied by the payload mass
+mL .
+
+Prepared using sagej.cls
+10                                                                    Journal Title XX(X)
+
+
+  Similarly, for the rotational channels, let θ̂R,i ∈ R5 , i = 1, 2, 3, denote
+the adaptive weights for roll, pitch, and yaw. The corresponding outputs
+are
+                   fˆR,i (ξ) = θ̂R,i
+                                 ⊤
+                                     h̄(ξ),   i = 1, 2, 3,                (14)
+and the rotational compensation vector is written as
+                                                        ⊤
+                 f̂R (ξ) = fˆR,1 (ξ) fˆR,2 (ξ) fˆR,3 (ξ) .
+                          
+                                                                                     (15)
+These two vectors are then injected into the translational and rotational
+backstepping controllers as adaptive compensation terms.
+  The adaptive weights are updated online using channel-wise Lyapunov-
+based laws. In the implementation, the update law uses the same six-
+dimensional RBF input vector ξ defined in (9).
+  The continuous-time adaptive law for each channel is implemented in
+the Lyapunov-based RBF adaptation form commonly used in adaptive
+neural control Sanner and Slotine (1992); Patino and Liu (2000):
+                            ˙
+                           θ̂i = γi,eff h̄(ξ) ξ ⊤ Pi Bi − κ γi,eff θ̂i ,             (16)
+where h̄(ξ) is the normalized RBF basis driven by the six-dimensional
+payload tracking-error input. The matrices Pi and Bi select and weight
+the corresponding channel error in the adaptive update, while the input
+vector itself remains ξ. In addition, κ > 0 is the leakage gain introduced to
+suppress parameter drift in the presence of approximation error, and γi,eff
+is an error-dependent effective adaptation gain Patino and Liu (2000). In
+the actual code, this gain is reduced inside a dead-zone region according
+to                                 
+                                    ∥ξ∥ , ∥ξ∥ < σ ,
+                                                      i
+                       γi,eff = γi    σi                                 (17)
+                                     1,     ∥ξ∥ ≥ σi ,
+                                   
+
+where σi is the dead-zone threshold. Equivalently, γi,eff =
+γi min(1, ∥ξ∥/σi ). In the current implementation, γi = 80 and σi = 0.1
+for the x-, y-, and attitude channels, whereas the z-translation channel
+uses γi = 20 and σi = 0.05. The discrete implementation uses forward
+Euler integration,
+                                                          ˙
+                              θ̂i (k + 1) = θ̂i (k) + ∆t θ̂i (k),                    (18)
+
+
+Prepared using sagej.cls
+Li et al.                                                                               11
+
+
+
+
+Figure 3. Channel-wise RBF neural network used for payload uncertainty approximation.
+
+
+  followed by parameter projection to enforce elementwise bounds and a
+norm bound on each five-parameter vector. In the current implementation,
+the z-translation channel is updated more conservatively than the x-, y-,
+and attitude channels because it uses a smaller nominal adaptation gain
+and a tighter dead-zone threshold.
+
+ESO-Based Disturbance Estimation
+Although RBF neural network can effectively estimate the unknown
+disturbance, the existence of model residual uncertainties and external
+disturbances may still degrade the control accuracy. To further improve the
+robustness of the system, an extended state observer (ESO) is introduced
+to estimate the residual disturbance online, following the disturbance-
+estimation idea of ADRC/ESO-based control Han (2009); Gao (2003);
+Madoński and Herman (2015); Gu et al. (2022).
+  For the translational channel, the payload dynamics can be rewritten in
+acceleration form as
+                             p̈L = Fp + dp ,                          (19)
+
+
+
+
+Prepared using sagej.cls
+12                                                              Journal Title XX(X)
+
+where pL is the payload position, Fp ∈ R3 denotes the known control-
+related acceleration term, and dp ∈ R3 represents the translational lumped
+disturbance including modeling errors and external perturbations.
+  Define the augmented states as
+                           zp1 = pL ,     zp2 = ṗL ,     zp3 = dp .           (20)
+Then, the corresponding ESO is designed as
+                  ˙
+                  ẑp1 = ẑp2 + βp1 (zp1 − ẑp1 ) ,
+                  
+                    ẑ˙ p2 = ẑp3 + Fp + βp2 (zp1 − ẑp1 ) ,                   (21)
+                  
+                  ˙
+                    ẑp3 = βp3 (zp1 − ẑp1 ) ,
+where ẑp1 , ẑp2 , and ẑp3 are the estimates of the payload position, velocity,
+and translational lumped disturbance, respectively.
+  Similarly, for the attitude channel, the dynamics can be expressed as
+                                        η̈L = Fη + dη ,                        (22)
+where ηL ∈ R3 denotes the payload attitude vector, Fη ∈ R3 is the known
+control-related angular-acceleration term, and dη ∈ R3 is the lumped
+disturbance in the attitude channel.
+  Define the augmented states as
+                           zη1 = ηL ,     zη2 = η̇L ,     zη3 = dη .           (23)
+The ESO for the attitude channel is then given by
+                 ˙
+                 ẑη1 = ẑη2 + βη1 (zη1 − ẑη1 ) ,
+                 
+                    ẑ˙ η2 = ẑη3 + Fη + βη2 (zη1 − ẑη1 ) ,                   (24)
+                 
+                 ˙
+                    ẑη3 = βη3 (zη1 − ẑη1 ) .
+  Based on the estimated disturbances, the compensation terms can be
+constructed as
+                            uESO,p = −ẑp3 ,      uESO,η = −ẑη3 .             (25)
+By incorporating these terms into the backstepping control law, the
+adverse effects of uncertainties and disturbances can be effectively
+attenuated, thereby improving the overall robustness and tracking
+performance of the cooperative transportation system.
+
+Prepared using sagej.cls
+Li et al.                                                                13
+
+Payload Control Law
+Using the tracking-error definitions, RBF approximation terms, and
+ESO disturbance estimates introduced above, the payload-layer controller
+computes the desired force Fd ∈ R3 in the inertial frame and the
+desired moment Md ∈ R3 applied to the payload. This subsection
+therefore focuses on how these previously defined compensation terms
+are incorporated into the force and moment control laws.
+Translational Control (Force Generation) Define the position and
+velocity tracking errors as
+                           epL = pL − pL,d ,      evL = vL − ṗL,d .    (26)
+   Following the Backstepping design, introduce the virtual control
+
+                                   αp = −Kp1 epL + ṗL,d ,              (27)
+where Kp1 ≻ 0 is a diagonal gain matrix. Then define the second-layer
+error as
+                  zp = vL − αp = evL + Kp1 epL .                 (28)
+   The nominal Backstepping force is designed as
+                       Fd,bs = mL (p̈L,d − Kp1 evL − Kp2 zp + ge3 ) ,   (29)
+where Kp2 ≻ 0 is a diagonal gain matrix.
+  The RBF translational estimate f̂p (ξ) in (9)–(16) and the ESO residual-
+disturbance estimate ẑp3 in (20)–(21) are then added as compensation
+terms. The translational control law is
+                              Fd = Fd,bs − mL f̂p (ξ) − mL ẑp3 .       (30)
+
+Here, ẑp3 denotes the componentwise translational disturbance estimate
+provided by the ESO.
+Rotational Control (Moment Generation) Define the payload attitude
+and angular-velocity tracking errors as
+
+                           eηL = ηL − ηL,d ,      eωL = ωL − η̇L,d ,    (31)
+where ηL denotes the payload attitude vector.
+
+
+Prepared using sagej.cls
+14                                                              Journal Title XX(X)
+
+   Similarly, define the virtual control for the rotational channel as
+                                  αη = −Kη1 eηL + η̇L,d ,                      (32)
+and the second-layer error as
+                              zη = ωL − αη = eωL + Kη1 eηL ,                   (33)
+where Kη1 ≻ 0.
+ The nominal Backstepping moment is designed as
+                           Md,bs = JL (η̈L,d − Kη1 eωL − Kη2 zη ) ,            (34)
+where Kη2 ≻ 0 is a diagonal gain matrix.
+   Using the rotational RBF estimate f̂R (ξ) and the ESO disturbance
+estimate ẑη3 defined in the previous subsections, the final desired moment
+is designed as
+                     Md = Md,bs − JL f̂R (ξ) − JL ẑη3 .               (35)
+Stability Analysis
+To verify the stability of the proposed composite controller under the
+ideal payload-layer model, this subsection analyzes the ESO observation
+error system and the closed-loop payload tracking error system based on
+Lyapunov theory. The following assumptions are introduced.
+  Assumption 1. The desired payload position, desired payload attitude,
+and their first- and second-order derivatives are continuous and bounded.
+  Assumption 2. For both the translational and rotational channels, the
+unknown nonlinear terms can be approximated by optimal constant RBF
+weights with bounded approximation errors.
+  Assumption 3. The hidden-layer outputs of the RBF neural networks
+are bounded.
+  Assumption 4. The augmented disturbance in the translational channel
+and the lumped disturbance in the rotational channel are continuously
+differentiable, and their time derivatives are bounded.
+  Assumption 5. The payload attitude trajectory remains in a compact
+subset where the local attitude-coordinate representation used for the
+rotational backstepping design is nonsingular.
+  To eliminate the effect of the known gravity term on the translational
+ESO error dynamics, the translational-channel augmented disturbance is
+redefined accordingly. Then, the translational ESO can be written in a
+standard augmented form.
+
+Prepared using sagej.cls
+Li et al.                                                                            15
+
+Boundedness of ESO Observation Errors Define the translational-
+channel ESO estimation error as
+                                               T
+                      z̃o,p = z̃Tp1 z̃Tp2 z̃Tp3 ,
+                              
+                                                                                    (36)
+where z̃pj = zpj − ẑpj , j = 1, 2, 3, denote the estimation errors of
+position, velocity, and lumped disturbance, respectively. By subtracting
+the observer equations from the plant equations, the translational ESO
+error dynamics can be written as
+                                     z̃˙ o,p = Ap z̃o,p + Bp ḋp ,                  (37)
+where
+                                                                           
+                       −βp1 I3 I3 03×3                                   03×3
+                 Ap = −βp2 I3 03×3 I3  ,                         Bp = 03×3  .   (38)
+                       −βp3 I3 03×3 03×3                                  I3
+By standard bandwidth parameterization of the ESO gains Gao (2003),
+the observer-error matrix Ap is Hurwitz. Therefore, for any symmetric
+positive definite matrix Qp , there exists a unique symmetric positive
+definite matrix Pp satisfying
+                                    ATp Pp + Pp Ap = −Qp .                          (39)
+Choose the Lyapunov function
+                                      VESO,p = z̃To,p Pp z̃o,p .                    (40)
+Differentiating VESO,p along the observer error dynamics yields
+
+                           V̇ESO,p = −z̃To,p Qp z̃o,p + 2z̃To,p Pp Bp ḋp .         (41)
+By Young’s inequality and Assumption 4, one obtains
+                                 V̇ESO,p ≤ −cp1 ∥z̃o,p ∥2 + cp2 ,                   (42)
+where cp1 > 0 and cp2 > 0 are constants. Hence, the translational ESO
+estimation error is uniformly ultimately bounded. Moreover, if ḋp → 0,
+then the estimation error converges to the origin exponentially.
+  Similarly, define the rotational-channel ESO estimation error as
+                                                  T
+                         z̃o,η = z̃Tη1 z̃Tη2 z̃Tη3 .
+                                
+                                                                   (43)
+
+Prepared using sagej.cls
+16                                                                  Journal Title XX(X)
+
+where z̃ηj = zηj − ẑηj , j = 1, 2, 3, denote the attitude, angular-rate, and
+lumped-disturbance estimation errors, respectively. Its error dynamics can
+be expressed as
+                           z̃˙ o,η = Aη z̃o,η + Bη ḋη ,                 (44)
+where Aη is also Hurwitz due to the bandwidth-based gain selection.
+Thus, for any symmetric positive definite matrix Qη , there exists a unique
+symmetric positive definite matrix Pη such that
+                                  ATη Pη + Pη Aη = −Qη .                           (45)
+Choose
+                                    VESO,η = z̃To,η Pη z̃o,η .                     (46)
+Following the same procedure gives
+                                V̇ESO,η ≤ −cη1 ∥z̃o,η ∥2 + cη2 ,                   (47)
+where cη1 > 0 and cη2 > 0 are constants. Therefore, the rotational ESO
+estimation error is uniformly ultimately bounded; when ḋη → 0, it
+converges exponentially to the origin.
+Closed-Loop Stability of the Composite Controller After establishing
+the boundedness of the ESO estimation errors, the overall closed-
+loop error system of the RBF-adaptive Backstepping-ESO controller is
+analyzed. Let the unknown acceleration-level translational uncertainty and
+rotational uncertainty be written as
+                fp∗ (ξ) = Θ∗T         r
+                           p h̄(ξ) + εp ,           fη∗ (ξ) = Θ∗T         r
+                                                               R h̄(ξ) + εη ,      (48)
+where Θ∗p and Θ∗R are stacked ideal constant RBF weight matrices
+consistent with the channel-wise vectors θp,i and θR,i defined above, and
+εrp and εrη are bounded approximation errors. The implemented stacked
+estimates are
+                                                          
+      Θ̂p = θ̂p,1 θ̂p,2 θ̂p,3 ,     Θ̂R = θ̂R,1 θ̂R,2 θ̂R,3 ,        (49)
+
+so that f̂p = Θ̂Tp h̄ and f̂R = Θ̂TR h̄. Define the RBF weight estimation
+errors and ESO disturbance-estimation errors as
+                           Θ̃p = Θ̂p − Θ∗p ,       Θ̃R = Θ̂R − Θ∗R ,               (50)
+                           z̃p3 = zp3 − ẑp3 ,      z̃η3 = zη3 − ẑη3 .            (51)
+
+Prepared using sagej.cls
+Li et al.                                                                         17
+
+Then the residual terms that cannot be cancelled by the implemented
+compensation are
+                             ∆p = εrp + z̃p3 ,        ∆η = εrη + z̃η3 .          (52)
+
+According to Assumption 2 and the ESO boundedness result, there exist
+constants ∆     ¯ η > 0 such that ∥∆p ∥ ≤ ∆
+           ¯ p, ∆                                         ¯ η.
+                                          ¯ p and ∥∆η ∥ ≤ ∆
+  Substituting the proposed control law into the translational and
+rotational dynamics yields the closed-loop error systems for the two
+channels. Define the composite tracking vectors
+                                T                     T
+                 χp = eTpL zTp ,         χη = eTηL zTη .
+                                              
+                                                                 (53)
+To interpret the channel-wise adaptive law (16), note that the same six-
+dimensional vector ξ is used in both the RBF approximation and the
+weight update. The scalar factor ξ T Pi Bi is the i-th channel projection of
+the Lyapunov cross term and does not define a new input variable. Using
+(27)–(35), the translational and rotational error dynamics can be expressed
+in the compact form
+                                                        
+                 χ̇p = Ac,p χp + Bc,p −Θ̃Tp h̄(ξ) + ∆p ,                (54)
+                                                                        
+                           χ̇η = Ac,η χη + Bc,η       −Θ̃TR h̄(ξ) + ∆η       ,   (55)
+where
+                                                                  
+                       −Kp1   I3                          −Kη1   I3
+               Ac,p =               ,           Ac,η =                 ,         (56)
+                        03×3 −Kp2                          03×3 −Kη2
+                                                        
+                                                    03×3
+                                    Bc,p = Bc,η =          .                     (57)
+                                                     I3
+Because Kp1 , Kp2 , Kη1 , and Kη2 are positive definite diagonal
+matrices, both Ac,p and Ac,η are block upper-triangular Hurwitz matrices.
+Therefore, for arbitrary symmetric positive definite matrices Q1 and
+Q2 , there exist unique symmetric positive definite matrices P1 and P2
+satisfying
+        ATc,p P1 + P1 Ac,p = −Q1 ,                ATc,η P2 + P2 Ac,η = −Q2 .     (58)
+
+
+
+Prepared using sagej.cls
+18                                                                               Journal Title XX(X)
+
+   Choose the Lyapunov candidate function as
+                        1           1
+                     V = χTp P1 χp + χTη P2 χη
+                        2           2
+                             3                  3                                               (59)
+                          1 X T −1           1 X T −1
+                        +       θ̃ Γ θ̃p,i +      θ̃ Γ θ̃R,i ,
+                          2 i=1 p,i p,i      2 i=1 R,i R,i
+
+where θ̃p,i and θ̃R,i are the channel-wise RBF weight estimation errors,
+and Γp,i = γp,i I5 and ΓR,i = γR,i I5 are the nominal positive definite
+channel-wise adaptive gain matrices.
+  Since all weighting matrices are positive definite, V is positive definite
+and radially unbounded with respect to the composite tracking errors and
+RBF weight estimation errors. Differentiating V along (54) and (55) gives
+                                  1            1
+                           V̇ = − χTp Q1 χp − χTη Q2 χη
+                                  2           2           
+                                    T
+                                + χp P1 Bc,p −Θ̃Tp h̄ + ∆p
+                                                                                                (60)
+                                                           
+                                + χTη P2 Bc,η −Θ̃TR h̄ + ∆η
+                                     3                          3
+                                     X                 ˙        X                 ˙
+                                 +           T
+                                           θ̃p,i Γ−1
+                                                  p,i θ̂p,i +
+                                                                        T
+                                                                      θ̃R,i Γ−1
+                                                                             R,i θ̂R,i .
+                                     i=1                        i=1
+
+The nominal part of the Lyapunov-based adaptive law (16) cancels the
+RBF cross terms in (60). When the dead-zone scaling makes γi,eff < γi , the
+corresponding uncancelled term is active only in the bounded small-error
+region and is absorbed into the residual constant below. The leakage term
+introduces negative quadratic damping for the estimated weights and a
+bounded constant depending on the ideal weights. Specifically, by Young’s
+inequality, the leakage contribution satisfies an inequality of the form
+                                          κ         κ
+                 θ̃iT Γ−1
+                       i    −κΓ i θ̂ i   ≤ − ∥θ̃i ∥2 + ∥θi∗ ∥2 .         (61)
+                                            2         2
+The residual terms are also bounded by Young’s inequality:
+                                                                    ¯2
+                                                        ∥P1 Bc,p ∥2 ∆p
+                           χTp P1 Bc,p ∆p ≤ δp ∥χp ∥2 +                 ,
+                                                             4δp
+                                                                    ¯2                          (62)
+                                                        ∥P2 Bc,η ∥2 ∆ η
+                           χTη P2 Bc,η ∆η ≤ δη ∥χη ∥2 +                 ,
+                                                             4δη
+
+Prepared using sagej.cls
+Li et al.                                                                19
+
+where δp > 0 and δη > 0 can be selected such that λmin (Q1 )/2 − δp > 0
+and λmin (Q2 )/2 − δη > 0. Therefore,
+                           V̇ ≤ − λ1 ∥χp ∥2 − λ2 ∥χη ∥2 − λ3 ∥Θ̃p ∥2F
+                                                                        (63)
+                                − λ4 ∥Θ̃R ∥2F + c,
+where λ1 , λ2 , λ3 , λ4 > 0 are constants, and c > 0 collects the bounded
+RBF approximation residuals, bounded ESO estimation residuals, and
+bounded leakage terms involving the ideal weights. Since V is
+quadratically bounded by the error vector
+                                                      T
+                 y = χTp χTη vec(Θ̃p )T vec(Θ̃R )T ,                  (64)
+there exist positive constants αV and αV such that
+                                   αV ∥y∥2 ≤ V ≤ αV ∥y∥2 .              (65)
+Consequently, there exist positive constants α and β such that
+                                        V̇ ≤ −αV + β.                   (66)
+Solving (66) gives
+                                            β
+                                               1 − e−αt .
+                              V (t) ≤ V (0)e−αt +
+                                                       
+                                                                        (67)
+                                            α
+Thus, V (t) is bounded for all t ≥ 0, and all components ofpy are
+uniformly ultimately bounded with ultimate radius proportional to β/α.
+According to the uniform ultimate boundedness criterion of Lyapunov
+theory, under Assumptions 1–5, the position tracking error, attitude
+tracking error, velocity-level backstepping errors, and RBF parameter
+estimation errors of the closed-loop payload-layer system are uniformly
+ultimately bounded.
+   Because the desired trajectories are bounded by Assumption 1,
+boundedness of epL , zp , eηL , and zη also implies bounded payload velocity
+and attitude-rate tracking errors. Together with the bounded ESO errors
+and projected/leakage-stabilized RBF weights, the compensation terms in
+(30) and (35) remain bounded. Hence, the proposed composite controller
+guarantees boundedness of the ideal payload-layer closed-loop signals and
+achieves bounded tracking of the payload position and attitude. If the
+RBF approximation residuals and ESO disturbance-estimation residuals
+converge to zero, then β can be made zero in the ideal case and the tracking
+errors converge asymptotically to the origin.
+
+Prepared using sagej.cls
+20                                                      Journal Title XX(X)
+
+Remark The above analysis shows that the Backstepping terms establish
+the nominal error convergence structure, the RBF neural networks
+compensate for the major unknown nonlinearities, and the ESO further
+estimates and suppresses the remaining lumped disturbances online.
+As a result, the proposed composite controller maintains the closed-
+loop stability and robustness of the payload transportation system under
+bounded uncertainties and external disturbances.
+Control Allocation and Cable Force Generation
+Following the geometric cooperative transport formulation in Lee et al.
+(2013a), the payload-level controller first computes the desired net wrench
+for payload motion tracking, consisting of a resultant force Fd ∈ R3
+expressed in the inertial frame and a resultant moment Md ∈ R3 expressed
+in the payload body frame. This pair (Fd , Md ) provides a compact
+interface between high-level tracking control and low-level actuation,
+because it captures both translational and rotational objectives in a unified
+form. Since the payload is driven through multiple cables rather than
+a single actuator, the control-allocation module then maps the desired
+wrench to individual cable forces while preserving the overall force–
+moment balance required by the payload dynamics.
+  The corresponding desired resultant force and moment acting on the
+payload are given by
+                       X n                    Xn
+                Fd =        Ti,d ,    Md =       ρ̂i RTL Ti,d .         (68)
+                           i=1               i=1
+
+where Ti,d denotes the desired tension vector exerted by the i-th cable on
+the payload. This notation is consistent with the payload dynamics, where
+Ti = −µi qi and µi > 0 is the scalar tension magnitude.
+  Let ρi ∈ R3 denote the attachment point of the i-th cable expressed in
+the payload body frame, and define the configuration matrix
+                                       
+                      I3 I3 · · · I3
+              P=                          ,     ρ̂i = S(ρi ).         (69)
+                      ρ̂1 ρ̂2 · · · ρ̂n
+Since the desired force is computed in the inertial frame while the desired
+moment is computed in the payload body frame, the commanded wrench
+is written as                       T 
+                                    R L Fd
+                             wd =            .                         (70)
+                                      Md
+
+Prepared using sagej.cls
+Li et al.                                                                          21
+
+The minimum-norm cable tensions in body coordinates are then obtained
+by
+                     Tbd = PT (PPT )−1 wd ,                      (71)
+and the Moore–Penrose pseudoinverse is used when PPT is singular. The
+desired inertial-frame cable tensions are recovered by rotating each block
+back to the world frame:
+                                 Td = diag(RL , . . . , RL )Tbd ,                 (72)
+where
+                                                 T1,d
+                                                     
+
+                                           Td =  ...  .                         (73)
+                                                 Tn,d
+  Because each cable can only transmit force along its current direction
+qi , the realized cable force is taken as the projection
+                                          Ti = qi qTi Ti,d .                      (74)
+The corresponding resultant payload force and moment are
+                                   n
+                                   X                        n
+                                                            X
+                           Fin =         Ti ,     Min =            ρ̂i RTL Ti .   (75)
+                                   i=1                       i=1
+
+These quantities are used in the simulation to evaluate the allocation error
+between the commanded wrench (Fd , Md ) and the actually generated
+wrench (Fin , Min ).
+
+Cable Direction Tracking and Quadrotor Force Command
+Following Lee et al. (2013a), after allocation the desired cable direction
+for the i-th UAV is defined from the allocated tension as
+                                                      Ti,d
+                                          qi,d = −           .                    (76)
+                                                     ∥Ti,d ∥
+and the desired cable angular velocity is computed as
+                                         ωi,d = qi,d × q̇i,d .                    (77)
+The cable tracking errors are chosen as
+                           eq,i = qi,d × qi ,        eω,i = ωi + q̂2i ωi,d .      (78)
+
+Prepared using sagej.cls
+22                                                                Journal Title XX(X)
+
+  To account for payload translation and rotation, the feedforward term
+for the i-th cable is
+             1             2              −1
+                                                           
+      ai =      Fin + RL Ω̂L ρi + RL ρ̂i JL Ω̂L JL ΩL − Min .       (79)
+            mL
+The total force command generated for the i-th quadrotor is decomposed
+into a normal component and a parallel component,
+                                       ui = ui,⊥ + ui,∥ .                           (80)
+The normal component is
+
+      ui,⊥ = mp,i li q̂i −Kq,i eq,i − Kω,i eω,i − (qTi ωi,d )q̇i − q̂2i ω̇i,d
+                                                                                
+                                                                                    (81)
+                 − mp,i q̂2i ai ,
+while the parallel component is
+
+                           ui,∥ = Ti + mp,i li ∥ωi ∥2 qi + qi qTi ai .
+                                                                    
+                                                                                    (82)
+Hence, each UAV receives a commanded inertial-force vector ui from the
+allocation module.
+
+Quadrotor Thrust and Attitude Command
+Following the geometric thrust-direction construction in Lee et al.
+(2013a,b), the cable-level controller provides for each quadrotor a
+commanded force vector ui ∈ R3 in the inertial frame. The role of the
+inner-loop UAV controller is to convert this vector into a thrust command
+and a corresponding attitude reference.
+  The desired body-fixed thrust direction is chosen to align with the
+commanded force, namely,
+                                                    ui
+                                        b3,i,d =         .                          (83)
+                                                   ∥ui ∥
+To complete the attitude specification, a desired yaw angle ψi,d is
+introduced through the horizontal reference direction
+                                             
+                                     cos ψi,d
+                          b1,ψ,i =  sin ψi,d  .              (84)
+                                        0
+
+
+Prepared using sagej.cls
+Li et al.                                                                              23
+
+An orthonormal desired body frame is then constructed as
+                              b3,i,d × b1,ψ,i
+                b2,i,d =                        ,        b1,i,d = b2,i,d × b3,i,d ,   (85)
+                             ∥b3,i,d × b1,ψ,i ∥
+which yields the desired rotation matrix
+                                                
+                      Ri,d = b1,i,d b2,i,d b3,i,d .                                   (86)
+  The thrust magnitude applied by the i-th quadrotor is obtained by
+projecting the commanded force onto the current body z-axis,
+                                           fi = uTi Ri e3 ,                           (87)
+where Ri ∈ SO(3) denotes the current attitude matrix and e3 = [0, 0, 1]T .
+   Although the desired attitude is generated geometrically, the attitude
+tracking controller used in this work is implemented in Euler-angle
+coordinates. Let
+
+                       ηi = [ϕi , θi , ψi ]T ,      ηi,d = [ϕi,d , θi,d , ψi,d ]T     (88)
+denote the current and desired Euler-angle vectors, respectively, with ηi,d
+extracted from Ri,d . The attitude tracking errors are defined as
+                    z1,i = ηi − ηi,d ,           z2,i = η̇i − η̇i,d + C1,i z1,i ,     (89)
+where C1,i is a positive definite gain matrix. The control moment is then
+designed as
+                       τi = B−1
+                             i (−z1,i − ci (η̇i ) + α̇1,i − C2,i z2,i ) ,             (90)
+
+where Bi is the input gain matrix associated with the quadrotor
+attitude dynamics, C2,i is a second positive definite gain matrix, and
+ci (η̇i ) represents the Coriolis/gyroscopic coupling term of the rotational
+subsystem.
+   Consequently, the force command ui obtained from the cable-load
+coordination layer is transformed into realizable thrust and moment
+commands for each quadrotor through the desired thrust direction, yaw
+specification, and Euler-angle-based inner-loop controller.
+
+
+
+
+Prepared using sagej.cls
+24                                                      Journal Title XX(X)
+
+Simulation Setup
+A high-fidelity numerical simulation environment was developed in
+MATLAB to assess the tracking performance and disturbance rejection
+capability of the proposed cooperative load-lifting system. The simulated
+platform consists of three identical quadrotors transporting a rigid
+rectangular payload through three taut flexible cables with fixed nominal
+length. The overall simulation is implemented as a hierarchical closed-
+loop system comprising payload-level control, force allocation, cable-
+direction regulation, and low-level quadrotor attitude control.
+
+Physical Parameters and Numerical Integration
+The coupled payload–quadrotor dynamics are integrated using a fixed-
+step fourth-order Runge–Kutta (RK4) scheme. A sampling interval of
+∆t = 0.001 s is adopted to capture the fast attitude and cable-direction
+dynamics, and each simulation runs for a total duration of Tf = 20 s.
+  The principal numerical, physical, and geometric parameters used in
+the simulations are listed in the Appendix. Unless otherwise stated, the
+three quadrotors are identical, each with mass mp = 2.0 kg and inertia
+matrix Jp = diag(0.082, 0.0845, 0.1377) kg · m2 . The payload mass is
+mL = 2.0 kg, its geometric dimensions are 1.0 × 0.8 × 0.2 m, and its
+inertia matrix is JL = diag(0.1133, 0.1733, 0.2733) kg · m2 .
+
+Initial Conditions and Geometric Configuration
+The quadrotors are initialized from a near-hover configuration with zero
+attitude angles, zero angular rates, and zero translational velocities. Their
+initial positions are
+                           p1 (0) = [0.5, 4.2, 0]T ,
+                           p2 (0) = [−0.5, 4.6, 0]T ,                   (91)
+                                                   T
+                           p3 (0) = [−0.5, 3.8, 0] .
+This slightly asymmetric arrangement avoids perfectly symmetric
+transient behavior at the start of the simulation.
+   The payload is initially placed at
+                           pL (0) = [0, 4.2, 0.1]T ,
+with zero translational velocity, zero angular displacement, and zero
+angular velocity. The attachment-point vectors expressed in the payload
+
+Prepared using sagej.cls
+Li et al.                                                                           25
+
+body frame are defined as
+                                    ρ1 = [0.5, 0.0, 0.1]T ,
+                                    ρ2 = [−0.5, 0.4, 0.1]T ,                       (92)
+                                                              T
+                                    ρ3 = [−0.5, −0.4, 0.1] .
+
+Operational Phases and Reference Trajectory
+The simulation is divided into two sequential phases.
+  First, during the takeoff phase, each quadrotor ascends vertically to a
+prescribed hovering position above its corresponding payload attachment
+point. The target altitude is selected as
+                              zi⋆ = li + hL = 1.0 + 0.2 = 1.2 m,
+where hL denotes the payload height. The takeoff phase is terminated once
+all quadrotors satisfy the altitude tolerance criterion of 10−3 m.
+  Second, after takeoff is completed, the payload tracking phase begins.
+At this point, the payload reference trajectory is generated with its time
+origin reset to zero, so that the commanded transport task is not time-
+shifted by the takeoff duration. The desired payload position is given by
+                                        
+                          1.5 sin(ωd t)
+                                                        2π
+            pL,d (t) = 4.2 cos(ωd t/2) ,       ωd =       rad/s,     (93)
+                                0.5                     10
+
+with analytically generated velocity and acceleration references.
+  The desired payload attitude is constructed from the tangent direction of
+the reference trajectory. Specifically, for ∥ṗL,d ∥ ≥ 10−3 ,
+                            ṗL,d                                  rd3 × rd1
+                rd1 =               ,     rd3 = e3 ,     rd2 =                 ,   (94)
+                           ∥ṗL,d ∥                               ∥rd3 × rd1 ∥
+and the desired rotation matrix is defined as
+                                             
+                         RL,d = rd1 rd2 rd3 .                                      (95)
+When the desired translational speed is close to zero, the reference attitude
+is set to RL,d = I3 . This construction aligns the payload heading with the
+instantaneous direction of motion while maintaining a horizontal body z-
+axis.
+
+Prepared using sagej.cls
+26                                                              Journal Title XX(X)
+
+Control Architecture and Disturbance Injection
+To avoid repeating the previously introduced control pipeline, this
+subsection focuses only on the disturbance setting used for robustness
+evaluation. When disturbance injection is enabled, the translational and
+rotational disturbance terms are modeled as
+
+                  dp (t) = 3 sin t + 0.2 sin 2t + 0.3 sin 3t + 0.4 sin 4t,     (96)
+                 dR (t) = 1 sin t + 0.2 sin 2t + 0.3 sin 3t + 0.4 sin 4t.      (97)
+In the implemented model, the same scalar disturbance dp (t) is injected
+into each translational channel of the payload dynamics, while dR (t) is
+injected into each rotational channel.
+
+Evaluation Protocol
+The simulation study is organized as a backstepping-family ablation so
+that the effect of each compensation module can be evaluated under
+the same nominal controller structure. Four payload-level controllers are
+evaluated under both no-disturbance and disturbance-injection conditions:
+     • Backstepping, the nominal recursive nonlinear tracking controller;
+     • RBF+Backstepping, where the RBF neural network is added for
+       online approximation of unmodeled nonlinear dynamics;
+     • ESO+Backstepping, where the ESO is added for online estimation
+       of lumped residual disturbances;
+     • RBF+ESO+Backstepping, the proposed composite controller
+       combining neural approximation and observer-based disturbance
+       compensation.
+  All controllers are evaluated under the same physical parameters, initial
+conditions, reference trajectory, and disturbance model. The reported
+RMS indices are computed from payload position and attitude errors
+over the final 80% of the stored simulation data. The controller and
+observer parameters used in the ablation runs are listed separately in
+the Appendix. The standalone Backstepping parameter set is used by the
+pure Backstepping case, while the RBF- and ESO-enabled cases share a
+common module-toggle baseline and differ only by the switches specified
+in Table 1.
+
+
+
+Prepared using sagej.cls
+Li et al.                                                                 27
+
+Table 1. Backstepping-family ablation cases
+
+    Controller                       RBF compensation ESO compensation
+    Backstepping                              Off             Off
+    Backstepping+RBF                          On              Off
+    Backstepping+ESO                          Off             On
+    Backstepping+RBF+ESO                      On              On
+
+
+Simulation Results and Discussion
+This section follows the ablation protocol defined in Section .
+The proposed method is decomposed into its constituent modules
+and compared with plain backstepping under nominal and disturbed
+conditions.
+
+Backstepping-Family Ablation Design
+The ablation study is designed to isolate the contribution of each
+compensation module while keeping the nominal backstepping structure,
+reference trajectory, allocation module, and UAV-level controller
+unchanged. The four ablation cases are summarized in Table 1. Each case
+is evaluated twice: once without external disturbance and once with the
+matched multi-harmonic disturbance terms.
+  Figures 4 and 5 present the payload position and attitude responses for
+the backstepping-family controllers under the two disturbance settings.
+The time-domain curves are kept in paired figure blocks to avoid splitting
+the two payload-error channels across unrelated pages.
+  From Fig. 4, it can be observed that all backstepping-family controllers
+stabilize the payload tracking errors under the no-disturbance condition.
+However, their transient responses are clearly different. The plain
+Backstepping controller exhibits relatively larger attitude deviations
+during the initial stage, especially in the roll and pitch channels, while
+the controllers with RBF or ESO compensation reduce the transient
+oscillations to different degrees. The proposed Backstepping+RBF+ESO
+controller shows the fastest attenuation of the initial position and attitude
+errors and maintains nearly zero steady-state errors after the transient
+process. This indicates that even in the nominal case, the additional
+compensation modules help suppress the effects of nonlinear coupling and
+allocation-induced modeling errors.
+
+Prepared using sagej.cls
+28                                                                 Journal Title XX(X)
+
+
+
+
+                   (a) Position error                         (b) Attitude error
+
+Figure 4. Backstepping-family ablation results without disturbance injection. The RBF and
+ESO modules improve the nominal backstepping response while preserving the same
+reference trajectory and allocation structure.
+
+
+
+
+                   (a) Position error                         (b) Attitude error
+
+Figure 5. Backstepping-family ablation results with disturbance injection. The complete
+Backstepping+RBF+ESO structure gives the most balanced reduction of payload position
+and attitude errors under the matched disturbance model.
+
+
+  Figure 5 further demonstrates the importance of disturbance compen-
+sation. When the external multi-harmonic disturbance is injected, the
+plain Backstepping controller shows obvious periodic tracking errors in
+both position and attitude channels. The RBF-only and ESO-only cases
+improve the response compared with plain Backstepping, but neither of
+them fully suppresses the disturbance-induced oscillations. In contrast,
+the complete Backstepping+RBF+ESO controller keeps all three position-
+error components within a much smaller range and also significantly
+
+Prepared using sagej.cls
+Li et al.                                                              29
+
+reduces the attitude-error oscillations. This result suggests that the RBF
+network and ESO play complementary roles: the RBF module compen-
+sates for structured nonlinear uncertainty, while the ESO estimates the
+remaining lumped disturbance online.
+
+Conclusion
+This paper presented an RBF-ESO backstepping control framework for
+multi-UAV cooperative payload transportation. The proposed controller
+uses backstepping to construct the nominal payload force and moment
+commands, an RBF neural network to approximate unmodeled nonlinear
+dynamics, and an ESO to estimate residual lumped disturbances online.
+   The simulation framework was rebuilt around a backstepping-
+family ablation study. Under no-disturbance and disturbance-injection
+conditions, the paper compares plain Backstepping, RBF+Backstepping,
+ESO+Backstepping, and RBF+ESO+Backstepping, which clarifies the
+individual contributions of the RBF and ESO modules. The results
+indicate that combining neural approximation with observer-based
+disturbance compensation improves tracking accuracy and disturbance
+rejection for the coupled aerial payload transportation system.
+   Overall, the proposed composite control structure provides a
+systematic way to integrate model-based backstepping, neural-network
+approximation, and observer-based disturbance estimation within a
+cooperative payload-transport framework. The ablation results show that
+the RBF and ESO components complement the nominal backstepping
+controller, yielding improved robustness without sacrificing attitude-
+tracking performance. These results demonstrate the effectiveness of
+the proposed method for accurate and robust multi-UAV payload
+transportation under nonlinear coupling and external disturbances.
+
+Simulation Parameters
+The numerical, physical, geometric, controller, and observer parameters
+used in the simulation study are listed in Tables 2 and 3.
+
+
+
+
+Prepared using sagej.cls
+30                                                                                  Journal Title XX(X)
+
+Table 2. Physical, geometric, and numerical parameters of the cooperative load-lifting
+system.
+Parameter                       Symbol                   Value
+Number of quadrotors            N                        3
+Integration step and duration   ∆t, Tf                   0.001 s, 20 s
+Quadrotor mass                  mp                       2.0 kg for each UAV
+Quadrotor inertia               Jp                       diag(0.082, 0.0845, 0.1377) kg · m2
+Payload mass                    mL                       2.0 kg
+Payload inertia                 JL                       diag(0.113333, 0.173333, 0.273333) kg · m2
+Payload dimensions              L×W ×H                   1.0 × 0.8 × 0.2 m
+Cable length                    li                       1.0 m for all three cables
+Gravitational acceleration      g                        9.81 m/s2
+Initial quadrotor positions     pi (0)                   [0.5, 4.2, 0]T , [−0.5, 4.6, 0]T , [−0.5, 3.8, 0]T
+Initial payload position        pL (0)                   [0, 4.2, 0.1]T
+Payload attachment points       ρi                       [0.5, 0, 0.1]T , [−0.5, 0.4, 0.1]T , [−0.5, −0.4, 0.1]T
+
+
+Table 3. Controller, allocation, RBF, and ESO parameters used in the ablation simulations.
+Parameter group                 No disturbance                             With disturbance
+Standalone     Backstepping     KΩq = [43.7, 28.23, 17.54],                KΩq = [50, 35, 25],               Kq =
+allocation                      Kq = [50, 50.1, 50], αf = 0.30             [60, 60, 60], αf = 0.25
+Standalone Backstepping pay-    c1 = c3 = diag(3, 3, 3), c2 = c4 =         c1 = c3 = diag(4, 4, 4),     c2 = c4 =
+load gains                      diag(1.5, 1.5, 1.5)                        diag(2, 2, 2)
+Module-toggle allocation        KΩq = [34.8689, 27.3479, 16.8925],         KΩq = [55, 40, 30],               Kq =
+                                Kq = [60.0511, 59.6435, 47.2322],          [65, 65, 65], αf = 0.20
+                                αf = 0.2895
+Module-toggle Backstepping      c1 = diag(2.5029, 3.0133, 3.5872),         c1 = c3 = diag(4, 4, 4),     c2 = c4 =
+gains                           c2 = diag(1.8811, 1.5180, 1.5678);         diag(2, 2, 2)
+                                c3 = diag(2.7003, 2.9653, 3.1537),
+                                c4 = diag(1.3247, 1.4669, 1.9170)
+RBF basis and initial weights   Centers [−0.8, −0.4, 0, 0.4, 0.8], width   Centers [−0.8, −0.4, 0, 0.4, 0.8], width
+                                b = 5.3526, θp,0 = 4.5024 × 10−4 ,         b = 6.0, θp,0 = θR,0 = 0.1
+                                θR,0 = 0.01185
+RBF projection and output       θmax = 2.5571, ∥θ∥max = 5.6241,            θmax = 50,            ∥θ∥max = 100,
+limits                          fn,max = 0.2575, τn,max = 0.1370           fn,max = 10, τn,max = 3
+RBF adaptation gains            γ = [0.3101, 0.1184, 4.6998],              γ = [80, 20, 80], k1 = k1R = 0.01,
+                                k1 = 0.0951,            k1R = 0.0244,      σ = [0.1, 0.05, 0.1],    Q = QR =
+                                σ = [0.2213, 0.1743, 0.1006],              diag(50, 50)
+                                Q = diag(58.1034, 58.1034),
+                                QR = diag(54.7321, 54.7321)
+Error feedback gains in adap-   kp,xy = 40.2845, kv,xy = 16.6367,          kp,xy = 40, kv,xy = 20, kp,z = 40,
+tation                          kp,z = 41.8709,       kv,z = 31.9809,      kv,z = 25, kp,R = 30, kv,R = 20
+                                kp,R = 28.5524, kv,R = 18.9505
+ESO bandwidth and compen-       ωp = 7.2199, ωR = 17.0364, sp =            ωp = ωR = 50, sp = sR = 1
+sation scale                    0.00464, sR = 0.01337
+ESO input gains                 bp = [0.5, 0.5, 0.5]T ,           bR =     bp = [0.5, 0.5, 0.5]T ,       bR =
+                                [0.113333, 0.173333, 0.273333]T            [0.113333, 0.173333, 0.273333]T
+
+
+
+
+Acknowledgements
+This work was supported by the 2024 National Foreign Experts Project (Individual Category).
+
+
+Declaration of conflicting interests
+The authors declare that there is no conflict of interest.
+
+Prepared using sagej.cls
+Li et al.                                                                                     31
+
+Funding
+This work was supported by the 2024 National Foreign Experts Project (Individual Category).
+
+
+References
+Bouabdallah S and Siegwart R (2005) Backstepping and sliding-mode techniques applied to an
+    indoor micro quadrotor. In: Proceedings of the IEEE International Conference on Robotics
+    and Automation. pp. 2247–2252. DOI:10.1109/ROBOT.2005.1570447.
+Broomhead DS and Lowe D (1988) Multivariable functional interpolation and adaptive networks.
+    Complex Systems 2: 321–355.
+Estevez J, Garate G, Lopez-Guede JM and Larrea M (2024) Review of aerial transportation of
+    suspended-cable payloads with quadrotors. Drones 8(2): 35. DOI:10.3390/drones8020035.
+Fink J, Michael N, Kim S and Kumar V (2011) Planning and control for cooperative manipulation
+    and transportation with aerial robots. The International Journal of Robotics Research 30(3):
+    324–334. DOI:10.1177/0278364910382803.
+Gao Z (2003) Scaling and bandwidth-parameterization based controller tuning.                 In:
+    Proceedings of the American Control Conference, volume 6. pp. 4989–4996. DOI:
+    10.1109/ACC.2003.1242516.
+Goodarzi FA, Lee D and Lee T (2015) Geometric control of a quadrotor uav transporting a payload
+    connected by flexible cable. International Journal of Control, Automation and Systems 13(6):
+    1486–1498. DOI:10.1007/s12555-014-0304-0.
+Gu N, Wang D, Peng Z, Wang J and Han QL (2022) Disturbance observers and extended state
+    observers for marine vehicles: A survey. Control Engineering Practice 123: 105158. DOI:
+    10.1016/j.conengprac.2022.105158.
+Han J (2009) From PID to active disturbance rejection control. IEEE Transactions on Industrial
+    Electronics 56(3): 900–906. DOI:10.1109/TIE.2008.2011621.
+Lee T (2014) Geometric control of multiple quadrotor uavs transporting a cable-suspended
+    rigid body. In: 53rd IEEE Conference on Decision and Control. pp. 6155–6160. DOI:
+    10.1109/CDC.2014.7040353.
+Lee T (2018) Geometric control of quadrotor uavs transporting a cable-suspended rigid
+    body.     IEEE Transactions on Control Systems Technology 26(1): 255–264.              DOI:
+    10.1109/TCST.2017.2656060.
+Lee T, Leok M and McClamroch NH (2013a) Geometric control of multiple quadrotor uavs
+    transporting a cable-suspended rigid body. IEEE Transactions on Control Systems Technology
+    21(4): 1341–1356.
+Lee T, Leok M and McClamroch NH (2013b) Nonlinear robust tracking control of a quadrotor
+    UAV on SE(3). Asian Journal of Control 15(3): 391–408. DOI:10.1002/asjc.567.
+Lee T, Sreenath K and Kumar V (2013c) Geometric control of cooperating multiple quadrotor
+    uavs with a suspended payload. In: 52nd IEEE Conference on Decision and Control. pp.
+    5510–5515. DOI:10.1109/CDC.2013.6760757.
+
+
+
+
+Prepared using sagej.cls
+32                                                                   Journal Title XX(X)
+
+Madani T and Benallegue A (2008) Adaptive control via backstepping technique and neural
+    networks of a quadrotor helicopter. In: IFAC Proceedings Volumes, volume 41. pp. 6513–
+    6518. DOI:10.3182/20080706-5-KR-1001.01098.
+Madoński R and Herman P (2015) Survey on methods of increasing the efficiency of extended state
+    observers. ISA Transactions 56: 18–27. DOI:10.1016/j.isatra.2014.11.008.
+Park J and Sandberg IW (1991) Universal approximation using radial-basis-function networks.
+    Neural Computation 3(2): 246–257. DOI:10.1162/neco.1991.3.2.246.
+Patino HD and Liu D (2000) Neural network-based model reference adaptive control system. IEEE
+    Transactions on Systems, Man, and Cybernetics, Part B (Cybernetics) 30(1): 198–204. DOI:
+    10.1109/3477.826961.
+Sanner RM and Slotine JJE (1992) Gaussian networks for direct adaptive control. IEEE
+    Transactions on Neural Networks 3(6): 837–863. DOI:10.1109/72.165588.
+Shen S and Xu J (2021) Adaptive neural network-based active disturbance rejection flight
+    control of an unmanned helicopter. Aerospace Science and Technology 119: 107062. DOI:
+    10.1016/j.ast.2021.107062.
+Sreenath K, Michael N and Kumar V (2013) Trajectory generation and control of a quadrotor
+    with a cable-suspended load–a differentially-flat hybrid system. In: Proceedings of the
+    IEEE International Conference on Robotics and Automation. pp. 4888–4895.              DOI:
+    10.1109/ICRA.2013.6631275.
+Thanh HLNN, Huynh TT, Vu MT, Mung NX, Tran HS, Kim SK, Vu TL and Nguyen NV (2022)
+    Quadcopter uavs extended states/disturbance observer-based nonlinear robust backstepping
+    control under uncertainties and disturbances. Sensors 22(14): 5082. DOI:10.3390/s22145082.
+Wang Z et al. (2022) Adaptive-based linear active disturbance rejection attitude control for a
+    quadrotor uav with external disturbances. Transactions of the Institute of Measurement and
+    Control DOI:10.1177/01423312211031781.
+
+
+
+
+Prepared using sagej.cls
+
