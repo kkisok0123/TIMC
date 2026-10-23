@@ -144,6 +144,31 @@ if abs(num_intervals * dt - Tf) > 1e-10 * max(1, Tf)
 end
 t = (0:num_intervals) * dt;
 N = numel(t);
+
+%% ==================== 非周期随机扰动（实验 B） ====================
+% 与 payload_drag_cd 同一注入范式：主脚本读配置 -> 写同名 global -> 动力学函数读取。
+% 启用时写入 global payload_random_disturbance；关闭时写入空值，行为与改动前完全一致。
+random_disturbance_cfg = resolve_random_disturbance_cfg(experiment_config);
+random_disturbance_trace = [];
+random_disturbance_hash = '';
+global payload_random_disturbance
+payload_random_disturbance = [];   % 每次运行前清空，杜绝上一轮 trace 泄漏
+if random_disturbance_cfg.enabled
+    if ~with_disturbance
+        error('TIMC:RandomDisturbanceConflict', ...
+            'experiment.disturbance.random.enabled=true requires with_disturbance=true.');
+    end
+    random_disturbance_trace = make_bandlimited_disturbance(t, random_disturbance_cfg.seed, ...
+        random_disturbance_cfg);
+    payload_random_disturbance = random_disturbance_trace;
+    random_disturbance_hash = random_disturbance_trace.hash;
+    fprintf(['[随机扰动] seed=%d, fc=%.3f Hz, RMS(pos)=%.3f m/s^2, ' ...
+        'RMS(att)=%.3f rad/s^2, hash=%s\n'], ...
+        random_disturbance_cfg.seed, random_disturbance_cfg.bandwidth_hz, ...
+        random_disturbance_cfg.amp_pos, random_disturbance_cfg.amp_att, random_disturbance_hash);
+else
+    random_disturbance_hash = 'disabled';
+end
 trajectory_config = struct();
 takeoff_iter = 0;
 if ~isempty(fieldnames(experiment_config)) && isfield(experiment_config, 'trajectory') && ...
@@ -570,6 +595,12 @@ if with_disturbance
     fprintf('干扰状态: 已启用 (with_disturbance = true)\n');
 else
     fprintf('干扰状态: 未启用 (with_disturbance = false)\n');
+end
+if random_disturbance_cfg.enabled
+    fprintf('扰动形式: 非周期随机 (AR(1) 低通, seed=%d, hash=%s)\n', ...
+        random_disturbance_cfg.seed, random_disturbance_hash);
+else
+    fprintf('扰动形式: 周期正弦叠加（4 正弦，与改动前一致）\n');
 end
 if isfield(controller_config, 'uav_control')
     if isfield(controller_config.uav_control, 'uav_F_type')
@@ -1229,6 +1260,9 @@ run_summary.ez_max = ez_max;
 run_summary.eRL_1_max = eRL_1_max;
 run_summary.eRL_2_max = eRL_2_max;
 run_summary.eRL_3_max = eRL_3_max;
+run_summary.random_disturbance_enabled = random_disturbance_cfg.enabled;
+run_summary.random_disturbance_seed = random_disturbance_cfg.seed;
+run_summary.random_disturbance_hash = random_disturbance_hash;
 
 run_result = struct();
 run_result.meta = struct( ...
@@ -1261,6 +1295,14 @@ run_result.desired = struct('DesPosL_main', DesPosL_main, 'RL_d_main', RL_d_main
 run_result.save_data = Save_extended;
 run_result.plot_data = plotData;
 run_result.metrics = run_summary;
+% 本工况的扰动组成（实验 B 需要证明"随机 / 周期"互斥且可复核）
+run_result.disturbance = struct( ...
+    'periodic_enabled', with_disturbance && ~random_disturbance_cfg.enabled, ...
+    'random_enabled', random_disturbance_cfg.enabled, ...
+    'random_seed', random_disturbance_cfg.seed, ...
+    'random_hash', random_disturbance_hash, ...
+    'random_cfg', random_disturbance_cfg, ...
+    'random_trace', random_disturbance_trace);
 if exist('theta_rbf', 'var')
     run_result.theta_rbf = theta_rbf;
 end
@@ -1420,5 +1462,46 @@ mode = 'periodic';
 if nargin >= 1 && isstruct(trajectory_config) && isfield(trajectory_config, 'mode') && ...
         ~isempty(trajectory_config.mode)
     mode = trajectory_config.mode;
+end
+end
+
+function cfg = resolve_random_disturbance_cfg(experiment_config)
+%% 解析 experiment.disturbance.random（实验 B）
+% 默认值即说明文档第 4 节的推荐取值：fc=1 Hz, 平移 RMS=1.0 m/s^2, 姿态 RMS=0.3 rad/s^2。
+% enabled 缺省为 false，保证不传该字段时行为与改动前完全一致。
+cfg = struct('enabled', false, 'seed', 101, 'amp_pos', 1.0, 'amp_att', 0.3, ...
+    'bandwidth_hz', 1.0);
+if nargin < 1 || ~isstruct(experiment_config) || ~isfield(experiment_config, 'disturbance')
+    return
+end
+disturbance_cfg = experiment_config.disturbance;
+if ~isstruct(disturbance_cfg) || ~isfield(disturbance_cfg, 'random')
+    return
+end
+random_cfg = disturbance_cfg.random;
+if ~isstruct(random_cfg)
+    error('TIMC:RandomDisturbance:BadConfig', 'experiment.disturbance.random must be a struct.');
+end
+if isfield(random_cfg, 'enabled') && ~isempty(random_cfg.enabled)
+    cfg.enabled = logical(random_cfg.enabled);
+end
+if isfield(random_cfg, 'seed') && ~isempty(random_cfg.seed)
+    validateattributes(random_cfg.seed, {'numeric'}, {'scalar', 'real', 'finite', 'nonnegative'});
+    cfg.seed = double(random_cfg.seed);
+end
+if isfield(random_cfg, 'amp_pos') && ~isempty(random_cfg.amp_pos)
+    validateattributes(random_cfg.amp_pos, {'numeric'}, {'scalar', 'real', 'finite', 'nonnegative'});
+    cfg.amp_pos = double(random_cfg.amp_pos);
+end
+if isfield(random_cfg, 'amp_att') && ~isempty(random_cfg.amp_att)
+    validateattributes(random_cfg.amp_att, {'numeric'}, {'scalar', 'real', 'finite', 'nonnegative'});
+    cfg.amp_att = double(random_cfg.amp_att);
+end
+if isfield(random_cfg, 'bandwidth_hz') && ~isempty(random_cfg.bandwidth_hz)
+    validateattributes(random_cfg.bandwidth_hz, {'numeric'}, {'scalar', 'real', 'finite', 'positive'});
+    cfg.bandwidth_hz = double(random_cfg.bandwidth_hz);
+end
+if cfg.enabled && cfg.amp_pos == 0 && cfg.amp_att == 0
+    error('TIMC:RandomDisturbance:ZeroAmplitude', 'Both amp_pos and amp_att are zero.');
 end
 end

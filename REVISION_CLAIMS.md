@@ -13,8 +13,9 @@
 | 无扰动工况 | 四组均 ≤ 1.5e-4 m，组间差异不构成证据 | 四组消融 |
 | RBF 权重范数 | 有 ESO：0.17–0.71；无 ESO：1.2–5.0（顶到投影半径） | 权重检查 |
 | 约化模型有符号张力 | 全部工况为正，最小值 1.81 N（0.5 倍质量） | 全部运行 |
+| 非周期随机扰动（5 种子） | 排序与周期扰动一致（20/20 严格单调）；ESO 改善 7.6 倍；复合/ESO = 0.942 ± 0.011（约 5.8%） | 随机扰动实验 |
 
-**一句话结论：ESO 是性能提升的主要来源；RBF 提供约 10% 的一致改进，但不具备失配/非线性特异性。**
+**一句话结论：ESO 是性能提升的主要来源；RBF 提供约 6–10% 的一致改进（周期扰动 9.7%、随机扰动 5.8%），排序在两类扰动下不变，但 RBF 不具备失配/非线性特异性。**
 
 ---
 
@@ -135,8 +136,19 @@
 
 ---
 
-## 11. 数字引用规范
+## 11. R1-6 / R2-1（扰动形式过于特殊）回复口径
 
+> **Reviewer comment (R1-6 / R2-1).** The disturbance used in the simulations is a fixed sum of four sinusoids, so the robustness evidence covers periodic disturbances only.
+>
+> **Response.** We added a non-periodic, band-limited random disturbance experiment without changing the controllers, the metric definitions, or any gain. The disturbance is generated as first-order low-pass filtered white noise (AR(1), bandwidth 1 Hz) with RMS 1.0 m/s² on translation and 0.3 rad/s² on attitude, three independent channels per block; the random disturbance replaces the periodic one rather than being superimposed, and the disabled path is bit-identical to the previous code. Four configurations × five fixed seeds (101/202/303/404/505) were run, 20/20 completed with no failures and no negative tensions. The ordering of the four configurations was unchanged in every seed—composite < ESO-only < RBF-only < plain backstepping—while the marginal gain of the RBF term decreased from 9.7% to 5.8% (composite/ESO-only 0.942 ± 0.011). We therefore state that the ranking is preserved under a more general disturbance class and that the marginal value of the learning term is condition-dependent in magnitude but consistent in sign; we do not claim statistical significance from five seeds.
+
+需要在正文中同时说明的口径：两类扰动的 RMS 量级不同（周期 `d_p` 约 2.15 m/s²，随机 1.0 m/s²），
+因此只比较排序与比值，不比较绝对误差；且 AR(1) 低通是洛伦兹谱（约 25% 方差在 1 Hz 以下，其余按 1/f² 衰减），
+不是理想带限信号，正文若写"band-limited"应补一句说明。
+
+---
+
+## 12. 数字引用规范
 正文里出现的每个改善百分比，都应能追溯到 `revision_runs/` 下的原始日志，并在文中注明：
 - 统一参数集（`load_lifting_controller_params.m` 默认值，未单独调参）
 - 时间窗（最后 20% 时间）
