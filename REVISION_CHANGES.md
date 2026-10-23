@@ -51,7 +51,7 @@
 
 ## 4. 四组预检查结果
 
-运行方式：`matlab -batch "run_backstepping_rbf_eso_ablation_cases"`（8 次运行，约 25 分钟）。
+运行方式：`matlab -batch "run_backstepping_rbf_eso_ablation_cases"`（8 次运行，约 40 分钟）。
 
 | 组别 | 扰动 | 位置 RMS (m) | 位置最大 (m) | 旋转角 RMS (rad) | 最小张力 (N) | 负张力样本 |
 | --- | --- | --- | --- | --- | --- | --- |
