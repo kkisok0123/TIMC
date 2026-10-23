@@ -32,6 +32,7 @@ uav_controller_type_override = get_option(options, 'uav_controller_type', 'backs
 uav_F_type_override = get_option(options, 'uav_F_type', []);
 uav_M_type_override = get_option(options, 'uav_M_type', []);
 save_run_data = get_option(options, 'save_run_data', true);
+save_workspace = get_option(options, 'save_workspace', false);
 run_output_dir = get_option(options, 'run_output_dir', fullfile(pwd, 'simulation_runs'));
 enable_default_plots = get_option(options, 'enable_default_plots', false);
 simulation_dt_override = get_option(options, 'dt', []);

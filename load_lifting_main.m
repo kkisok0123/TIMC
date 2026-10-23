@@ -7,10 +7,15 @@ uav_F_type_override_local = [];
 uav_M_type_override_local = [];
 controller_param_override_local = [];
 save_run_data_local = true;
+save_workspace_local = true;
 run_output_dir_local = fullfile(pwd, 'simulation_runs');
 enable_default_plots_local = true;
 simulation_dt_override_local = [];
 simulation_Tf_override_local = [];
+
+if exist('save_workspace', 'var')
+    save_workspace_local = save_workspace;
+end
 
 if exist('controller_type_override', 'var')
     controller_type_override_local = controller_type_override;
@@ -52,7 +57,8 @@ if ~exist('batch_output_dir', 'var')
     clearvars -except controller_type_override_local with_disturbance_override_local ...
         uav_controller_type_override_local uav_F_type_override_local uav_M_type_override_local ...
         controller_param_override_local save_run_data_local run_output_dir_local ...
-        enable_default_plots_local simulation_dt_override_local simulation_Tf_override_local
+        enable_default_plots_local simulation_dt_override_local simulation_Tf_override_local ...
+        save_workspace_local
 end
 close all;
 % Reset the existing persistent controller banks at every simulation start.
@@ -1261,9 +1267,11 @@ if save_run_data_local
     workspace_mat_filename = fullfile(run_output_dir_local, ...
         sprintf('simulation_workspace_%s_%s_%s.mat', controller_name, uav_control_str, disturbance_str));
     save(run_mat_filename, 'run_result', '-v7.3');
-    save(workspace_mat_filename, '-v7.3');
     fprintf('运行结果已保存到 MAT 文件: %s\n', run_mat_filename);
-    fprintf('完整工作区已保存到 MAT 文件: %s\n', workspace_mat_filename);
+    if save_workspace_local
+        save(workspace_mat_filename, '-v7.3');
+        fprintf('完整工作区已保存到 MAT 文件: %s\n', workspace_mat_filename);
+    end
 end
 
 assignin('base', 'simulation_run_output', run_result);
