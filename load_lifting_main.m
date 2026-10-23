@@ -638,10 +638,9 @@ for i = 1:N
         % 输出顺序：Fd, Md, errors_controller, theta_rbf, fn, fn_att, h_rbf_all, eso_state
         [Fd, Md, errors_controller, theta_rbf, ~, ~, ~, eso_state] = ...
             load_lifting_payload_control_interface(payload_controller_type, params);
-        
-        % 更新ESO状态和控制输入（用于下一次迭代）
+
+        % ESO 状态在下一轮更新；u_prev 在分配完成后写入"实际施加的 Fin/Min"
         eso_state_prev = eso_state;
-        u_prev = [Fd; Md];  % 保存当前控制输入，用于下一次ESO更新
     else
         % 经典控制器或其他控制器
         [Fd, Md, errors_controller, RL] = ...
@@ -660,6 +659,13 @@ for i = 1:N
     %% ========== 第二部分：解算模块 - 将控制力和控制力矩分配到各无人机 ==========
     [Fin, Min, miui, qi_d_now, sOmegaid_now, e_qi, e_sOmegai, a, Us, sOmega_dot, input_error,miu_i_d] = ...
         load_lifting_allocation(Fd, Md, RL_cur, rho, qi, sOmega, sOmega_d, qi_d, Ome_L, controller_config);
+
+    % ESO 下一轮使用本区间实际施加的合力/合力矩（约化模型真实接收的输入）
+    if strcmpi(payload_controller_type, 'rbf')
+        u_prev = [Fin; Min];
+    end
+    % 约化模型的有符号张力指标：T_i = -q_i' * mu_i（不是实物张力），所有组都记录
+    Save_extended.Tension_Save(save_idx, :) = -sum(qi .* miui, 1);
     
     %% ========== 第三部分：计算无人机的控制力和控制力矩 ==========
     [Fplant, Mplant, angled_p, Omegaid_now, e_Ri_all, e_Omegai_all, Rd_i_now, R_i, x_att] = ...
@@ -836,47 +842,13 @@ for i = 1:N
     end
 
     %% 用于保存上一次的结果用来求导
-    % 更新下一次的q_i
+    % 更新下一次的q_i：只做一次积分，再做单位长度数值修正。
+    % 不再把实际方向向期望方向插值（那会人为掩盖模型误差）；期望方向只通过
+    % sOmega_d / qi_d 进入分配环节。
     qi_d = qi_d_now;
-    qi = qi + dt * q_now_dot;
-    % 平滑更新qi：结合积分更新和期望方向的平滑过渡
-    % 方法：归一化 + 平滑过渡到期望方向（使用SLERP球面线性插值）
-    alpha_smooth = 0.15;  % 平滑系数，值越小越平滑（0-1之间），可根据需要调整
     for q_num = 1 : Quadrotor_Num
-        % 先进行积分更新
-        qi_new = qi(:, q_num) + dt * q_now_dot(:, q_num);
-        % 归一化，确保是单位向量
-        qi_new = qi_new / (norm(qi_new) + 1e-10);  % 添加小值避免除零
-
-        % 平滑过渡到期望方向（避免突然跳变）
-        % 计算当前qi_new和期望qi_d_now之间的角度
-        qi_d_normalized = qi_d_now(:, q_num) / (norm(qi_d_now(:, q_num)) + 1e-10);
-        dot_product = qi_new' * qi_d_normalized;
-        % 限制dot_product在[-1, 1]范围内，避免数值误差
-        dot_product = max(-1, min(1, dot_product));
-        angle_diff = acos(dot_product);
-
-        % 如果角度差异较大，使用球面线性插值（SLERP）进行平滑过渡
-        if angle_diff > 1e-6  % 避免除零
-            % 使用SLERP进行平滑插值
-            % t_smooth控制插值比例：角度差异越大，插值比例越小（更保守）
-            t_smooth = min(1, alpha_smooth * dt / (angle_diff + 1e-6));  % 基于时间步长和角度差异的自适应平滑
-            % SLERP公式：在单位球面上进行线性插值
-            sin_angle = sin(angle_diff);
-            if sin_angle > 1e-6
-                qi(:, q_num) = (sin((1-t_smooth)*angle_diff) / sin_angle) * qi_new + ...
-                              (sin(t_smooth*angle_diff) / sin_angle) * qi_d_normalized;
-            else
-                % sin(angle_diff)太小，直接线性插值
-                qi(:, q_num) = (1-t_smooth) * qi_new + t_smooth * qi_d_normalized;
-            end
-        else
-            % 角度差异很小，直接使用积分结果
-            qi(:, q_num) = qi_new;
-        end
-
-        % 最终归一化，确保数值精度
-        qi(:, q_num) = qi(:, q_num) / (norm(qi(:, q_num)) + 1e-10);
+        qi(:, q_num) = qi(:, q_num) + dt * q_now_dot(:, q_num);
+        qi(:, q_num) = qi(:, q_num) / (norm(qi(:, q_num)) + 1e-12);
     end
     % 更新sOmega_d
     sOmega_d = sOmegaid_now;
@@ -1104,6 +1076,11 @@ controller_name_map.classic = 'PD';
 controller_name_map.backstepping = 'Backstepping';
 controller_name_map.smc = 'SMC';
 controller_name_map.rbf = 'RBF+RISE';
+% 返修版复合控制器以反步为名义控制，日志名称按实际基准控制器标注
+if isfield(controller_config, 'rbf') && isfield(controller_config.rbf, 'base_mode') && ...
+        strcmpi(char(controller_config.rbf.base_mode), 'backstepping')
+    controller_name_map.rbf = 'BS+RBF+ESO';
+end
 
 % 获取控制器名称
 if isfield(controller_name_map, lower(payload_controller_type))

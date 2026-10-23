@@ -33,16 +33,16 @@ function params = load_lifting_controller_params(controller_type_override, with_
 %       params.uav_control.uav_M_rise: RISE 参数（uav_M_type='rise' 时使用）
 %       params.uav_disturbance: 无人机扰动配置（独立于负载 with_disturbance）
 %       params.rbf: RBF控制器参数（仅当controller_type='rbf'时有效）
-%           params.rbf.c_rbf: RBF网络中心 (6 x 5)
-%           params.rbf.c_adapt_rbf: 自适应RBF网络中心 (2 x 5)
-%           params.rbf.b_rbf: RBF网络宽度 (5 x 1)
+%           params.rbf.c_rbf: 归一化二维中心 (2 x 5)，中心点 + 四个角点
+%           params.rbf.center_scale_pos: 位置通道归一化尺度 [误差; 误差导数]
+%           params.rbf.center_scale_att: 姿态通道归一化尺度 [误差; 误差导数]
+%           params.rbf.b_rbf: 归一化单位下的节点宽度 (5 x 1)
 %           params.rbf.theta_rbf_init: RBF参数初始值 (30 x 1)
-%           params.rbf.theta_max: RBF参数最大绝对值
-%           params.rbf.theta_norm_max: RBF参数向量最大范数
+%           params.rbf.theta_norm_max: 每通道权重的闭球投影半径（唯一参数保护）
 %           params.rbf.load_rbf_params: 是否从Excel加载RBF参数
 %           params.rbf.rbf_params_filename: RBF参数文件名
-%           params.rbf.output_limits: RBF补偿输出限幅
-%           params.rbf.adaptation: RBF自适应律参数
+%           params.rbf.adaptation: 固定学习率与泄漏系数 (gama, gama_att, sigma)
+%       params.eso: 扩展状态观测器参数（以 Fin/Min 为输入，显式含重力与姿态映射）
 
 global Quadrotor_Num
 global m_p1 m_p2 m_p3 m_p4 m_p
@@ -161,38 +161,23 @@ params.uav_control.reference.yaw_rate_limit = deg2rad(30);
 if isempty(m_L) || isempty(b1_L) || isempty(b2_L) || isempty(b3_L)
     load_lifting_parameters;
 end
+% ESO：预测模型已显式包含重力、质量与 RBF 输出，因此不再需要单独的输入系数。
+% 姿态通道按 eta_ddot = T(eta)*J0^{-1}(M - omega x J0 omega) + T_dot*omega 更新。
 omega_o_default = 50;
 params.eso.beta_pos = [3 * omega_o_default * ones(3, 1), ...
                        3 * omega_o_default^2 * ones(3, 1), ...
                        omega_o_default^3 * ones(3, 1)];
-params.eso.b_pos = [1 / m_L; 1 / m_L; 1 / m_L];
 params.eso.beta_att = [3 * omega_o_default * ones(3, 1), ...
                        3 * omega_o_default^2 * ones(3, 1), ...
                        omega_o_default^3 * ones(3, 1)];
-params.eso.b_att = [1 / b1_L; 1 / b2_L; 1 / b3_L];
 params.eso.use_compensation = true;
 params.eso.compensation_scale = 1.0;
-params.eso.compensation_scale_pos = 1.0;
-params.eso.compensation_scale_att = 1.0;
-params.rbf.output_limits = struct('fn_max', 10, 'fn_att_max', 3);
+
+% RBF 自适应律：固定学习率 + 泄漏项，去掉与误差相关的可变增益和 Lyapunov 方程求解。
 params.rbf.adaptation = struct( ...
-    'kp_pos_xy', 40, ...
-    'kv_pos_xy', 20, ...
-    'kp_pos_z', 40, ...
-    'kv_pos_z', 25, ...
-    'kp_att', 30, ...
-    'kv_att', 20, ...
-    'gama', 80, ...
-    'gama_z', 20, ...
-    'gama_att', 80, ...
-    'k1', 0.01, ...
-    'k1_att', 0.01, ...
-    'sigma', 0.1, ...
-    'sigma_z', 0.05, ...
-    'sigma_att', 0.1, ...
-    'Q_i', diag([50, 50]), ...
-    'Q_att', diag([50, 50]), ...
-    'B_i', [0; 1]);
+    'gama', 20, ...
+    'gama_att', 20, ...
+    'sigma', 0.05);
 
 % ==================== 无人机扰动配置（独立于负载扰动） ====================
 % 1) initial_state: 在仿真开始时直接对无人机状态叠加一个小偏置
@@ -310,6 +295,11 @@ switch lower(controller_type)
             params.allocation.Kq_i(2) = 65;
             params.allocation.Kq_i(3) = 65;
             params.allocation.alpha_filter = 0.2;  % 响应更快
+            % 与反步控制器完全相同的名义增益：四组消融必须共用同一名义控制
+            params.payload_control.backstepping.c1 = diag([4, 4, 4]);
+            params.payload_control.backstepping.c2 = diag([2, 2, 2]);
+            params.payload_control.backstepping.c3 = diag([4, 4, 4]);
+            params.payload_control.backstepping.c4 = diag([2, 2, 2]);
         else
             % 无干扰：使用和反步控制器相同的参数（为了让去掉RBF补偿后结果一致）
             params.allocation.KsOmega_i(1) = 43.7;  % 与反步控制器一致
@@ -319,36 +309,33 @@ switch lower(controller_type)
             params.allocation.Kq_i(2) = 50.1;  % 与反步控制器一致
             params.allocation.Kq_i(3) = 50;  % 与反步控制器一致
             params.allocation.alpha_filter = 0.3;  % 与反步控制器一致
+            % 与反步控制器完全相同的名义增益
+            params.payload_control.backstepping.c1 = diag([3, 3, 3]);
+            params.payload_control.backstepping.c2 = diag([1.5, 1.5, 1.5]);
+            params.payload_control.backstepping.c3 = diag([3, 3, 3]);
+            params.payload_control.backstepping.c4 = diag([1.5, 1.5, 1.5]);
         end
         
-        % ========== RBF网络参数配置 ==========
-        % RBF网络中心（6维输入：位置和姿态误差）
-        % 使用网格分布：在[-1, 1]范围内分布5个中心
-        center_values = [-0.8, -0.4, 0, 0.4, 0.8];
-        params.rbf.c_rbf = zeros(6, 5);
-        for j = 1:5
-            params.rbf.c_rbf(:, j) = center_values(j) * ones(6, 1);
-        end
-        
-        % RBF网络中心（2维输入：每个自由度的误差和误差导数，用于自适应律）
-        params.rbf.c_adapt_rbf = zeros(2, 5);
-        for j = 1:5
-            params.rbf.c_adapt_rbf(:, j) = center_values(j) * ones(2, 1);
-        end
-        
-        % RBF网络宽度
-        params.rbf.b_rbf = 6.0 * ones(5, 1);
-        
+        % ========== RBF网络参数配置（返修版：统一二维基函数） ==========
+        % 每个通道输入 [本通道误差; 本通道误差导数]，输出与自适应更新共用同一套
+        % 归一化基函数。中心在归一化平面上取"中心点 + 四个角点"，不做聚类。
+        params.rbf.c_rbf = [-1, -1,  1,  1, 0; ...
+                            -1,  1, -1,  1, 0];   % 2 x 5（归一化单位）
+        % 归一化尺度：误差 / 误差导数 各自的特征量级（物理单位）
+        params.rbf.center_scale_pos = [0.5; 0.5];    % [m; m/s]
+        params.rbf.center_scale_att = [0.10; 0.50];  % [rad; rad/s]
+        % 归一化单位下的节点宽度
+        params.rbf.b_rbf = 0.8 * ones(5, 1);
+
         % RBF参数初始值（30x1：6自由度 × 5个RBF节点）
-        params.rbf.theta_rbf_init = 0.1 * ones(30, 1);
-        
-        % RBF参数投影限制（防止参数发散导致fn变成inf）
-        params.rbf.theta_max = 50;  % 每个RBF参数的最大绝对值
-        params.rbf.theta_norm_max = 100;  % 每个自由度RBF参数向量的最大范数
+        params.rbf.theta_rbf_init = zeros(30, 1);
+
+        % 唯一的参数保护：每个通道权重向量的闭球投影半径
+        params.rbf.theta_norm_max = 5;
         params.rbf.enable_compensation = true;
         params.rbf.compensation_scale = 1.0;
         params.rbf.enable_adaptation = true;
-        params.rbf.base_mode = 'rise';
+        params.rbf.base_mode = 'backstepping';
         
         % RBF参数加载选项
         params.rbf.load_rbf_params = false;  % 是否从Excel文件加载上次训练的RBF参数
