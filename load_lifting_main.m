@@ -128,6 +128,13 @@ if isfield(experiment_config, 'payload_plant')
 end
 m_L = payload_plant.mass; J_L = payload_plant.inertia;
 Jx_L = J_L(1,1); Jy_L = J_L(2,2); Jz_L = J_L(3,3);
+% 未建模二次气动阻力（仅作用于被控对象，不进入控制器模型）
+global payload_drag_cd
+payload_drag_cd = 0;
+if isfield(experiment_config, 'payload_plant') && isstruct(experiment_config.payload_plant) && ...
+        isfield(experiment_config.payload_plant, 'drag_cd') && ~isempty(experiment_config.payload_plant.drag_cd)
+    payload_drag_cd = experiment_config.payload_plant.drag_cd;
+end
 % N samples, N-1 zero-order-held integration intervals; no step beyond Tf.
 validateattributes(dt, {'numeric'}, {'scalar','real','finite','positive'});
 validateattributes(Tf, {'numeric'}, {'scalar','real','finite','nonnegative'});
