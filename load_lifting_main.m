@@ -1467,9 +1467,9 @@ end
 
 function cfg = resolve_random_disturbance_cfg(experiment_config)
 %% 解析 experiment.disturbance.random（实验 B）
-% 默认值即说明文档第 4 节的推荐取值：fc=1 Hz, 平移 RMS=1.0 m/s^2, 姿态 RMS=0.3 rad/s^2。
+% 默认值即说明文档第 4 节的推荐取值：fc=1 Hz, 平移 RMS=2.15 m/s^2, 姿态 RMS=0.3 rad/s^2。
 % enabled 缺省为 false，保证不传该字段时行为与改动前完全一致。
-cfg = struct('enabled', false, 'seed', 101, 'amp_pos', 1.0, 'amp_att', 0.3, ...
+cfg = struct('enabled', false, 'seed', 101, 'amp_pos', 2.15, 'amp_att', 0.3, ...
     'bandwidth_hz', 1.0);
 if nargin < 1 || ~isstruct(experiment_config) || ~isfield(experiment_config, 'disturbance')
     return

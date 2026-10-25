@@ -135,7 +135,7 @@
 
 - 生成器 `make_bandlimited_disturbance.m`：AR(1) 低通白噪声，`a=exp(-2πfc·dt)`，
   `x_k = a·x_{k-1} + sqrt(1-a²)·w_k`，去均值后逐通道归一化到目标 RMS；fc = 1 Hz，
-  平移 RMS = 1.0 m/s²，姿态 RMS = 0.3 rad/s²；三轴（平移/姿态各 3 个）独立生成。
+  平移 RMS = 2.15 m/s²，姿态 RMS = 0.3 rad/s²；三轴（平移/姿态各 3 个）独立生成。
 - 注入：`load_lifting_main.m` 读 `experiment.disturbance.random` → 写
   `global payload_random_disturbance` → `load_lifting_payload_dynamics.m` 用
   `interp1(...,'linear',0)` 逐时刻取值（RK4 中间时刻同样插值，不用 ZOH）。
@@ -163,8 +163,8 @@
 
 **必须写明的口径限制**（避免被审稿人抓）：
 
-- 两类扰动的 RMS 量级不同（周期 `d_p` 的 RMS 约 2.15 m/s²，随机 `d_p` 为 1.0 m/s²），
-  所以**只能比较排序与比值，不能比较绝对误差**；随机工况下四组的绝对误差整体更小是量级差异造成的。
+- 上述数值来自随机 `d_p` 的 RMS 为 1.0 m/s² 的旧实验；统一改为 2.15 m/s² 后必须重跑并更新，不能直接沿用。
+- 新实验将随机 `d_p` 的 RMS 与周期扰动统一为 2.15 m/s²，两张表的数值可以直接并列比较；两类扰动的频谱和时间波形仍不同。
 - AR(1) 低通在 1 Hz 处的功率谱是洛伦兹型，约 25% 的方差在 1 Hz 以下、其余按 1/f² 衰减到 Nyquist；
   它不是"限带到 1 Hz 的理想带限信号"，而是"低通塑形的宽带信号"。若要主张带限，应说明这一点。
 - 5 个种子只用于初步离散度，正文不得声称统计显著性。

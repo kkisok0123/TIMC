@@ -142,9 +142,9 @@
 >
 > **Response.** We added a non-periodic, band-limited random disturbance experiment without changing the controllers, the metric definitions, or any gain. The disturbance is generated as first-order low-pass filtered white noise (AR(1), bandwidth 1 Hz) with RMS 1.0 m/s² on translation and 0.3 rad/s² on attitude, three independent channels per block; the random disturbance replaces the periodic one rather than being superimposed, and the disabled path is bit-identical to the previous code. Four configurations × five fixed seeds (101/202/303/404/505) were run, 20/20 completed with no failures and no negative tensions. The ordering of the four configurations was unchanged in every seed—composite < ESO-only < RBF-only < plain backstepping—while the marginal gain of the RBF term decreased from 9.7% to 5.8% (composite/ESO-only 0.942 ± 0.011). We therefore state that the ranking is preserved under a more general disturbance class and that the marginal value of the learning term is condition-dependent in magnitude but consistent in sign; we do not claim statistical significance from five seeds.
 
-需要在正文中同时说明的口径：两类扰动的 RMS 量级不同（周期 `d_p` 约 2.15 m/s²，随机 1.0 m/s²），
-因此只比较排序与比值，不比较绝对误差；且 AR(1) 低通是洛伦兹谱（约 25% 方差在 1 Hz 以下，其余按 1/f² 衰减），
-不是理想带限信号，正文若写"band-limited"应补一句说明。
+需要在正文中同时说明的口径：上述回复及数值来自随机扰动 RMS 为 1.0 m/s² 的旧实验；新实验已将随机与周期扰动的平移 RMS 统一为 2.15 m/s²，
+必须完成 20 个 case 的重跑并更新结果后，才能直接并列比较两张表的绝对误差。两类扰动的频谱和时间波形仍不同；且 AR(1) 低通是洛伦兹谱
+（约 25% 方差在 1 Hz 以下，其余按 1/f² 衰减），不是理想带限信号，正文若写"band-limited"应补一句说明。
 
 ---
 

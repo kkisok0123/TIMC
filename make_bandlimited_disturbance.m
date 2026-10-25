@@ -12,7 +12,7 @@ function trace = make_bandlimited_disturbance(t, seed, cfg)
 %   seed : 整数随机种子（101/202/303/404/505）
 %   cfg  : 结构体，字段（缺省值见下）
 %          bandwidth_hz : 一阶低通截止频率（Hz），默认 1.0
-%          amp_pos      : 平移三轴目标 RMS（m/s^2），默认 1.0
+%          amp_pos      : 平移三轴目标 RMS（m/s^2），默认 2.15
 %          amp_att      : 姿态三轴目标 RMS（rad/s^2），默认 0.3
 %
 % 输出：
@@ -65,7 +65,7 @@ if grid_err > 1e-9 * max(1, abs(dt))
 end
 
 fc = get_cfg_value(cfg, 'bandwidth_hz', 1.0);
-amp_pos = get_cfg_value(cfg, 'amp_pos', 1.0);
+amp_pos = get_cfg_value(cfg, 'amp_pos', 2.15);
 amp_att = get_cfg_value(cfg, 'amp_att', 0.3);
 validateattributes(fc, {'numeric'}, {'scalar', 'real', 'finite', 'positive'}, mfilename, 'cfg.bandwidth_hz');
 validateattributes(amp_pos, {'numeric'}, {'scalar', 'real', 'finite', 'nonnegative'}, mfilename, 'cfg.amp_pos');
