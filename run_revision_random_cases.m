@@ -29,7 +29,7 @@ function run_revision_random_cases(varargin)
 %% ==================== 参数 ====================
 opts.seeds = [101 202 303 404 505];
 opts.methods = {'BS', 'BS_RBF', 'BS_ESO', 'BS_RBF_ESO'};
-opts.amp_pos = 2.15;         % 平移三轴目标 RMS (m/s^2)，与周期扰动对齐
+opts.amp_pos = 1.0;          % 平移三轴目标 RMS (m/s^2)
 opts.amp_att = 0.3;          % 姿态三轴目标 RMS (rad/s^2)
 opts.bandwidth_hz = 1.0;     % 低通截止 (Hz)
 opts.position_limit = 5.0;   % 失败判据：位置误差上限 (m)
@@ -472,13 +472,8 @@ if any(~isfinite(ref_pos))
     return
 end
 fprintf(fid, '参考工况：同一参数集、周期扰动（4 正弦，drag cd = 0，即四组消融的"有扰动"一组）。\n');
-if abs(opts.amp_pos - 2.15) < 1e-12
-    fprintf(fid, '两类扰动的平移 RMS 均为 2.15 m/s²，可以直接并列比较绝对误差；');
-    fprintf(fid, '但频谱和时间波形不同，仍同时列出排序与比值。\n\n');
-else
-    fprintf(fid, '随机扰动平移 RMS 为 %.3f m/s²，周期扰动约为 2.15 m/s²；', opts.amp_pos);
-    fprintf(fid, '量级不一致时只比较排序与比值，不直接比较绝对误差。\n\n');
-end
+fprintf(fid, '两类扰动的 RMS 量级不同（周期 d_p 的 RMS 约 2.15 m/s²，随机 d_p 为 1.0 m/s²），');
+fprintf(fid, '因此**只比较排序与比值，不比较绝对误差**。\n\n');
 fprintf(fid, '| method | 周期扰动 load_pos_rms (m) | 随机扰动 load_pos_rms mean (m) |\n');
 fprintf(fid, '|---|---|---|\n');
 for k = 1:4
