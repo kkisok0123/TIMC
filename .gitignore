@@ -17,3 +17,10 @@ mujoco/outputs/
 
 # Keep generated simulation data out of the GitHub repository.
 *.mat
+
+# 返修阶段批量运行输出（run_result、指标、图）
+revision_runs/
+
+# MATLAB 编辑器临时文件
+*.asv
+*.autosave
